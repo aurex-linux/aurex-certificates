@@ -1,0 +1,16 @@
+Source: aurex-certificates
+Section: misc
+Priority: optional
+Maintainer: Luis Antonio Garcia Gisbert <luisgg@gmail.com>
+Build-Depends: debhelper ( >= 7 )
+Homepage: https://github.com/luisgg
+Standards-Version: 3.9.3
+
+Package: aurex-certificates
+Architecture: all
+Depends: openssl, ca-certificates, tofrodos, libnss3-tools, aurex-transmute, ${misc:Depends}
+Enhances: openssl, ca-certicates
+Description: CA Certificates management for aurex
+ This package installs additional PEM files of CA certificates and
+ the required scripts to manage system and user Ca certificates database
+

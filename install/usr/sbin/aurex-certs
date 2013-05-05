@@ -1,0 +1,193 @@
+#!/bin/bash
+# -------
+# File:        aurex-certs
+# Description: aurex certificate manager
+#              adapted to aurex from 'lliurex-certs'
+# Author:      (lliurex-certs) Luis Garcia Gisbert <garcia_luigis@gva.es>
+# Updates:     2013-05 adapted to aurex by Luis Garcia Gisbert <luisgg@gmail.com>
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along 
+# with this program; if not, write to the Free Software Foundation, Inc., 
+# 51 Franklin St, Fifth Floor, Boston MA 02110-1301 USA
+# --------
+
+set -e
+
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+
+# variables
+EVIL_SIGN='!'
+
+# source the lib file
+. "/usr/share/aurex-certificates/aurex-certificates-common" >/dev/null 2>&1 || { echo "Error: file \"$_\" not found" >&2 ; exit 1 ; }
+
+# functions
+usage() {
+  CMD_NAME="$(basename "$0")"
+  echo -e "\
+Usage: $CMD_NAME [options] {add|del} DIR_1 [... DIR_N]\n\
+       options: -v (verbose)" >&2
+}
+
+show_message(){
+   echo "aurex-certificates: $1"
+}
+
+test_certificate(){
+   [ -f "$1" ] || return 1
+   return 0
+}
+
+install_file(){
+   local source_file target_file octal_mode TMP_FILE
+   source_file="$1"
+   target_file="$2"
+   octal_mode="$3"
+   [ -z "$octal_mode" ] || octal_mode="-m $octal_mode"
+   TMP_FILE="$(tempfile $octal_mode)"
+   cat "$source_file" > "$TMP_FILE"
+   mv "$TMP_FILE" "$target_file"
+}
+
+do_install_certificate(){
+   # guess certificate type by trial and error method
+   CTYPE="unknown"
+   for t in PEM DER ; do
+      if openssl x509 -inform $t -in "$1" -noout -subject >/dev/null 2>/dev/null ; then
+         CTYPE=$t
+         break
+      fi
+   done
+   # TODO: look for a CRLF certificate to test this code ...
+   if [ "$CTYPE" = "PEM" ] &&  file "$1" |grep -q " CRLF line " ; then
+         CTYPE="CRLF"
+   fi
+   TMP_FILE="$(tempfile)"
+   COUT_FILE="$2"
+   case "$CTYPE" in
+      DER)
+         # DER/Binary certificate
+         [ -z "$VERBOSE" ] || show_message "Installing DER/Binary certificate $1 as $COUT_FILE"
+         openssl x509 -inform der -in ${1} -out ${TMP_FILE}
+         install_file "$TMP_FILE" "$COUT_FILE" 644
+         ;;
+      CRLF)
+         # ASCII CRLF
+         [ -z "$VERBOSE" ] || show_message "Installing ASCII CRLF certificate $1 as $COUT_FILE"
+         cat "$1" |fromdos |install_file "-" "$COUT_FILE" 644
+         ;;
+      PEM)
+         # ASCII certificate
+         [ -z "$VERBOSE" ] || show_message "Installing ASCII certificate $1 as $COUT_FILE"
+         install_file "${1}" "$COUT_FILE" 644
+         ;;
+      *) 
+         # Non manageable certificate 
+         [ -z "$VERBOSE" ] || show_message "Non manageable certificate $1" 
+         ;;
+   esac
+   rm -f "$TMP_FILE"
+   return 0
+}
+
+do_del_cfgline(){
+   sed -e "\#^${EVIL_SIGN}\?${1}#d" "$LCERTS_CFG"
+   return 0
+}
+
+do_reg_certificate(){
+   REL_FILE="${1#$CA_CERTS_DIR/}"
+   { do_del_cfgline "$REL_FILE" ; echo "$REL_FILE" ; } |install_file "-" "$LCERTS_CFG"
+   return 0
+}
+
+do_unreg_certificate(){
+   REL_FILE="${1#$CA_CERTS_DIR/}"
+   # remove file from conf
+   [ -z "$VERBOSE" ] || show_message "Uninstalling certificate file $REL_FILE from database"
+   do_del_cfgline "$REL_FILE" |install_file "-" "$LCERTS_CFG"
+   echo "${EVIL_SIGN}${REL_FILE}" >> "$2"
+   return 0
+}
+
+# ----
+# main
+# ----
+
+ACTION=""
+VERBOSE=""
+# check option(s)
+if [ "$1" = "-v" ] ; then
+   VERBOSE="y"
+   shift
+fi
+
+echo " add del " |grep -q " $1 " || usage
+ACTION="$1"
+shift
+[ "$1" ] || usage
+rc=0
+
+case $ACTION in
+   add)
+      while [ "$1" ] ; do
+         CERT_DIR="$(basename $1)"
+         # simulate print0 to allow format string
+         get_rel_files "$1" |while read -d $'\0' certfile ; do
+            if test_certificate "$1/$certfile" ; then
+              REL_PATH="$(dirname "${CERT_DIR}/$certfile")"
+              CERT_NAME="$(basename "$certfile")"
+              CERT_BASENAME="${CERT_NAME%.*}.crt"
+              mkdir -p "${LCERTS_DIR}/${REL_PATH}"
+              CERT_FILE="${LCERTS_DIR}/${REL_PATH}/${CERT_BASENAME}"
+              do_install_certificate "$1/$certfile" "${CERT_FILE}"
+              do_reg_certificate "${CERT_FILE}"
+            fi
+         done
+         shift
+      done
+      [ -z "$VERBOSE" ] || show_message "Updating certificates database"
+      update-ca-certificates || rc=$?
+      ;;
+   del)
+      TMP_CONF="$(tempfile)"
+      SAVED_CONF="$(tempfile)"
+      while [ "$1" ] ; do
+         CERT_DIR="$(basename $1)"
+         SOURCE_DIR="${LCERTS_DIR}/${CERT_DIR}"
+         if [ -d "$SOURCE_DIR" ] ; then
+            get_rel_files "$SOURCE_DIR" |while read -d $'\0' certfile ; do
+               CERT_FILE="${SOURCE_DIR}/$certfile"
+               do_unreg_certificate "${CERT_FILE}" "$TMP_CONF"
+            done
+            cat "$LCERTS_CFG" > "$SAVED_CONF"
+            cat "$LCERTS_CFG" "$TMP_CONF" |llxcfg-install "-" "$LCERTS_CFG"
+            update-ca-certificates || rc=$?
+            llxcfg-install "$SAVED_CONF" "$LCERTS_CFG"
+            :> "$TMP_CONF"
+            [ -z "$VERBOSE" ] || show_message "Deleting directory $SOURCE_DIR"
+            rm -rf "$SOURCE_DIR"
+         fi
+         shift
+      done
+      rm -f "$TMP_CONF" "$SAVED_CONF"
+      ;;
+   *)
+      usage
+      ;;
+esac
+
+[ -z "$VERBOSE" ] || show_message "Done"
+
+exit $rc
+

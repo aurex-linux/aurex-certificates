@@ -1,0 +1,5 @@
+#!/bin/sh
+
+aurex-transmute --module=certificates transmute || true
+aurex-certs add /usr/share/aurex-certificates/cece.gva.es || true
+#DEBHELPER#
