@@ -48,7 +48,7 @@ test_certificate(){
    return 0
 }
 
-install_file(){
+safe_install(){
    local source_file target_file octal_mode TMP_FILE
    source_file="$1"
    target_file="$2"
@@ -79,17 +79,17 @@ do_install_certificate(){
          # DER/Binary certificate
          [ -z "$VERBOSE" ] || show_message "Installing DER/Binary certificate $1 as $COUT_FILE"
          openssl x509 -inform der -in ${1} -out ${TMP_FILE}
-         install_file "$TMP_FILE" "$COUT_FILE" 644
+         safe_install "$TMP_FILE" "$COUT_FILE" 644
          ;;
       CRLF)
          # ASCII CRLF
          [ -z "$VERBOSE" ] || show_message "Installing ASCII CRLF certificate $1 as $COUT_FILE"
-         cat "$1" |fromdos |install_file "-" "$COUT_FILE" 644
+         cat "$1" |fromdos |safe_install "-" "$COUT_FILE" 644
          ;;
       PEM)
          # ASCII certificate
          [ -z "$VERBOSE" ] || show_message "Installing ASCII certificate $1 as $COUT_FILE"
-         install_file "${1}" "$COUT_FILE" 644
+         safe_install "${1}" "$COUT_FILE" 644
          ;;
       *) 
          # Non manageable certificate 
@@ -107,7 +107,7 @@ do_del_cfgline(){
 
 do_reg_certificate(){
    REL_FILE="${1#$CA_CERTS_DIR/}"
-   { do_del_cfgline "$REL_FILE" ; echo "$REL_FILE" ; } |install_file "-" "$LCERTS_CFG"
+   { do_del_cfgline "$REL_FILE" ; echo "$REL_FILE" ; } |safe_install "-" "$LCERTS_CFG"
    return 0
 }
 
@@ -115,7 +115,7 @@ do_unreg_certificate(){
    REL_FILE="${1#$CA_CERTS_DIR/}"
    # remove file from conf
    [ -z "$VERBOSE" ] || show_message "Uninstalling certificate file $REL_FILE from database"
-   do_del_cfgline "$REL_FILE" |install_file "-" "$LCERTS_CFG"
+   do_del_cfgline "$REL_FILE" |safe_install "-" "$LCERTS_CFG"
    echo "${EVIL_SIGN}${REL_FILE}" >> "$2"
    return 0
 }
@@ -171,9 +171,9 @@ case $ACTION in
                do_unreg_certificate "${CERT_FILE}" "$TMP_CONF"
             done
             cat "$LCERTS_CFG" > "$SAVED_CONF"
-            cat "$LCERTS_CFG" "$TMP_CONF" |llxcfg-install "-" "$LCERTS_CFG"
+            cat "$LCERTS_CFG" "$TMP_CONF" |safe_install "-" "$LCERTS_CFG"
             update-ca-certificates || rc=$?
-            llxcfg-install "$SAVED_CONF" "$LCERTS_CFG"
+            safe_install "$SAVED_CONF" "$LCERTS_CFG"
             :> "$TMP_CONF"
             [ -z "$VERBOSE" ] || show_message "Deleting directory $SOURCE_DIR"
             rm -rf "$SOURCE_DIR"

@@ -8,7 +8,7 @@ Standards-Version: 3.9.3
 
 Package: aurex-certificates
 Architecture: all
-Depends: openssl, ca-certificates, tofrodos, libnss3-tools, aurex-transmute, ${misc:Depends}
+Depends: openssl, ca-certificates, tofrodos, libnss3-tools, aurex-transmute, aurex-browser-profile, ${misc:Depends}
 Enhances: openssl, ca-certicates
 Description: CA Certificates management for aurex
  This package installs additional PEM files of CA certificates and

@@ -6,6 +6,7 @@
 # Author:      (lliurex-user-certs) Fco Javier Lopez Perez <lopez_frajav@gva.es>
 # Revision:    Luis Antonio García Gisbert <garcia_luigis@gva.es>
 # Updates:     2013-05 aurex adaptation by Luis Antonio García Gisbert <luisgg@gmail.com>
+#                      added support for multiple browsers via aurex-broser-profile
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,38 +32,41 @@ FIREFOX_CERT_DB="cert8.db"
 # source the lib file
 . "/usr/share/aurex-certificates/aurex-certificates-common" >/dev/null 2>&1 || { echo "Error: file \"$_\" not found" >&2 ; exit 1 ; }
 
-if [ -d "$HOME/$MOZILLA_DIR" ] ; then
-	# Mozilla user settings directory exist
-	cert_databases=$(find "$HOME/$MOZILLA_DIR" -name "$FIREFOX_CERT_DB")
-	for cert_db in ${cert_databases} ; do 
-		dirname_cert=$(dirname "$cert_db")
-		get_rel_files "$LCERTS_DIR" |while read -d $'\0' relcert ; do
-                	certificate="$LCERTS_DIR/$relcert"
-			info="$(openssl x509 -in $certificate -noout -subject |sed -e "s%^.*\/CN=\([^/]\+\).*$%\1%")"
-			ADD_CERTIFICATE="Y"
-			# search in database
-			if certutil -L -d "$dirname_cert" | grep -q "^$info" ; then
-				TMP1="$(tempfile)"
-				# dump new certificate
-				openssl x509 -in $certificate > "$TMP1" || true
-				TMP2="$(tempfile)"
-                                # dump current certificate
-				certutil -L -a -d "$dirname_cert" -n "$info" > "$TMP2" || true
-				# compare without cr/lf
-				if diff -q --strip-trailing-cr "$TMP1" "$TMP2" >/dev/null ; then
-					# are just the same, so do nothing
-					ADD_CERTIFICATE=""
-				else
-					# remove old
-					certutil -D -n "$info" -d "$dirname_cert" || true
-				fi
-				rm -f "$TMP1" "$TMP2"
+aurex-browser-profile all init || true
+
+cert_databases=$(aurex-browser-profile all get-cert-db)
+for cert_db in ${cert_databases} ; do
+	dirname_cert=$(dirname "$cert_db")
+	if [ "$(basename "$cert_db")" = "cert9.db" ] ; then
+		# chromium database format support
+		dirname_cert="sql:$dirname_cert"
+	fi
+	get_rel_files "$LCERTS_DIR" |while read -d $'\0' relcert ; do
+               	certificate="$LCERTS_DIR/$relcert"
+		info="$(openssl x509 -in $certificate -noout -subject |sed -e "s%^.*\/CN=\([^/]\+\).*$%\1%")"
+		ADD_CERTIFICATE="Y"
+		# search in database
+		if certutil -L -d "$dirname_cert" | grep -q "^$info" ; then
+			TMP1="$(tempfile)"
+			# dump new certificate
+			openssl x509 -in $certificate > "$TMP1" || true
+			TMP2="$(tempfile)"
+                        # dump current certificate
+			certutil -L -a -d "$dirname_cert" -n "$info" > "$TMP2" || true
+			# compare without cr/lf
+			if diff -q --strip-trailing-cr "$TMP1" "$TMP2" >/dev/null ; then
+				# are just the same, so do nothing
+				ADD_CERTIFICATE=""
+			else
+				# remove old
+				certutil -D -n "$info" -d "$dirname_cert" || true
 			fi
-			if [ "$ADD_CERTIFICATE" = "Y" ] ; then
-				certutil -A -n "$info" -t "CT,C,C" -i "$certificate" -d "$dirname_cert"
-			fi
-		done
+			rm -f "$TMP1" "$TMP2"
+		fi
+		if [ "$ADD_CERTIFICATE" = "Y" ] ; then
+			certutil -A -n "$info" -t "CT,C,C" -i "$certificate" -d "$dirname_cert"
+		fi
 	done
-fi
+done
 
 exit 0

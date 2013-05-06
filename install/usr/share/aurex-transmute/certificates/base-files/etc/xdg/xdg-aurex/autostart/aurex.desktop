@@ -2,8 +2,8 @@
 Version=1.0
 Encoding=UTF-8
 Name=aurex Certificates Management
-Comment=Load aurex extra certificates into Firefox database
-Comment[es]=Carga certificados adicionales de aurex en la base de datos del Firefox
+Comment=Load aurex extra certificates into web browsers user's databases
+Comment[es]=Carga certificados adicionales de aurex en las bases de datos de usuario de los navegadores web
 Exec=/usr/bin/aurex-user-certs
 Terminal=false
 Type=Application

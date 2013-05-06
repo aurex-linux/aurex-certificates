@@ -1,3 +1,9 @@
+aurex-certificates (0.18) precise; urgency=low
+
+  * Added support for multiple browsers via aurex-broser-profile
+
+ -- Luis Antonio Garcia Gisbert <luisgg@gmail.com>  Mon, 06 May 2013 13:09:54 +0200
+
 aurex-certificates (0.17) precise; urgency=low
 
   * Package name changed to aurex-certificates
