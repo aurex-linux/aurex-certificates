@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # variables
-CA_CERTS_DIR="/usr/share/aurex-certificates"
+CA_CERTS_DIR="/usr/share/ca-certificates"
 LCERTS_DIR="${CA_CERTS_DIR}/aurex-certs"
 LCERTS_CFG="/etc/ca-certificates.conf"
 
