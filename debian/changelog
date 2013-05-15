@@ -1,3 +1,9 @@
+aurex-certificates (0.19) precise; urgency=low
+
+  * xdg autostart desktop renamed to "aurex-certificates"
+
+ -- Luis Antonio Garcia Gisbert <luisgg@gmail.com>  Wed, 15 May 2013 17:29:15 +0200
+
 aurex-certificates (0.18) precise; urgency=low
 
   * Added support for multiple browsers via aurex-broser-profile
